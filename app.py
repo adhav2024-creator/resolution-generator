@@ -24,7 +24,7 @@ def generate_pdf(comp_name, reg_num, res_date, res_type, res_text, directors_dat
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # Header Section
+    # Header
     c.setFont("Helvetica-Bold", 14)
     c.drawCentredString(width/2, height - 50, comp_name.upper())
     c.setFont("Helvetica", 10)
@@ -32,7 +32,7 @@ def generate_pdf(comp_name, reg_num, res_date, res_type, res_text, directors_dat
     c.drawCentredString(width/2, height - 78, "Incorporated in Singapore")
     c.line(50, height - 90, width - 50, height - 90)
     
-    # Resolution Title
+    # Title
     c.setFont("Helvetica-Bold", 11)
     y = height - 120
     title = f"Directors’ Meeting Resolution in writing pursuant to the Company’s Articles of Association dated {res_date.strftime('%d/%m/%Y')}"
@@ -43,10 +43,9 @@ def generate_pdf(comp_name, reg_num, res_date, res_type, res_text, directors_dat
         
     y -= 20
     c.setFont("Helvetica-Bold", 12)
-    # Correctly handles splitting the resolution name
     c.drawString(50, y, res_type.split('. ')[1].upper())
     
-    # Body Text
+    # Body
     y -= 30
     c.setFont("Helvetica", 11)
     res_lines = simpleSplit(res_text, "Helvetica", 11, width - 100)
@@ -65,26 +64,21 @@ def generate_pdf(comp_name, reg_num, res_date, res_type, res_text, directors_dat
     # Signatures
     y -= 50
     c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "Certified as true record")
-    y -= 15
-    c.drawString(50, y, "Of Minutes")
+    c.drawString(50, y, "Certified as true record of Minutes")
     
-    # directors_data is now a list of dictionaries: {'name': ..., 'id': ...}
     for director in directors_data:
         if director['name']:
-            if y < 100: # Simple page break check
+            if y < 120:
                 c.showPage()
                 y = height - 50
-                
             y -= 60
             c.drawString(50, y, "…………………………………………………………………")
             y -= 15
             c.drawString(50, y, director['name'].upper())
             y -= 15
             c.setFont("Helvetica", 10)
-            # Added ID Number to the PDF signature line
-            id_text = f"Director (NRIC/Passport: {director['id']})" if director['id'] else "Director"
-            c.drawString(50, y, id_text)
+            id_info = f"Director (NRIC/Passport: {director['id']})" if director['id'] else "Director"
+            c.drawString(50, y, id_info)
             c.setFont("Helvetica-Bold", 11)
 
     c.showPage()
@@ -108,7 +102,6 @@ with col_in:
     st.write("**Signing Directors**")
     n_dirs = st.number_input("Number of Signing Directors", 1, 5, 2)
     
-    # UPDATED: Collect both Name and ID in a structured way
     directors_data = []
     for i in range(int(n_dirs)):
         d_col1, d_col2 = st.columns(2)
@@ -120,44 +113,54 @@ with col_in:
     
     st.divider()
     sentence = ""
-    # Dynamic Logic for resolution body text
-    if "1. Appointment" in r_type:
+    
+    # 2. Resignation Logic Updated
+    if "2. Resignation" in r_type:
+        # User picks which of the signing directors is resigning
+        resigning_choice = st.selectbox("Select Resigning Director", [d['name'] for d in directors_data if d['name']])
+        
+        # Find the ID for the chosen name
+        res_id = next((d['id'] for d in directors_data if d['name'] == resigning_choice), "")
+        
+        if resigning_choice:
+            sentence = f"RESOLVED THAT the resignation of {resigning_choice.upper()}, NRIC/Passport No. {res_id}, as a director of the company, effective {r_date.strftime('%d/%m/%Y')}, be and is hereby accepted."
+    
+    # 1. Appointment (Still needs new input because the person isn't a director yet)
+    elif "1. Appointment" in r_type:
         n = st.text_input("New Director Name")
         i = st.text_input("New Director NRIC/Passport")
         sentence = f"RESOLVED THAT {n}, NRIC/Passport No. {i}, be and is hereby appointed as a director of the company, effective {r_date.strftime('%d/%m/%Y')}."
-    elif "2. Resignation" in r_type:
-        n = st.text_input("Resigning Director Name")
-        i = st.text_input("Resigning Director NRIC/Passport")
-        sentence = f"RESOLVED THAT the resignation of {n}, NRIC/Passport No. {i}, as a director of the company, effective {r_date.strftime('%d/%m/%Y')}, be and is hereby accepted."
+    
+    # Other Resolutions...
     elif "3. Change of Registered Office" in r_type:
         addr = st.text_area("New Address")
         sentence = f"RESOLVED THAT the registered office of the company be changed to {addr}, with effect from {r_date.strftime('%d/%m/%Y')}."
     elif "4. Issuance of New Shares" in r_type:
         n = st.text_input("Subscriber Name")
-        q = st.text_input("Quantity of Shares")
-        p = st.text_input("Price per Share")
-        sentence = f"RESOLVED THAT the company issue {q} new ordinary shares at a price of {p} each, to {n}, with the corresponding share capital to be increased accordingly."
+        q = st.text_input("Quantity")
+        p = st.text_input("Price")
+        sentence = f"RESOLVED THAT the company issue {q} new ordinary shares at a price of {p} each, to {n}."
     elif "5. Transfer of Shares" in r_type:
         q = st.text_input("No. of Shares")
-        f = st.text_input("From (Transferor)")
-        t = st.text_input("To (Transferee)")
-        sentence = f"RESOLVED THAT the transfer of {q} shares from {f} to {t} be and is hereby approved and that the necessary updates be made to the company’s register of members."
+        f = st.text_input("From")
+        t = st.text_input("To")
+        sentence = f"RESOLVED THAT the transfer of {q} shares from {f} to {t} be and is hereby approved."
     elif "6. Declaration of Dividends" in r_type:
-        a = st.text_input("Amount per share (e.g. $1.00)")
-        sentence = f"RESOLVED THAT a final dividend of {a} per ordinary share be declared, payable on {r_date.strftime('%d/%m/%Y')}."
+        a = st.text_input("Amount per share")
+        sentence = f"RESOLVED THAT a final dividend of {a} per ordinary share be declared."
     elif "7. Approval of Financial Statements" in r_type:
-        sentence = f"RESOLVED THAT the financial statements of the company for the financial year ended {r_date.strftime('%d/%m/%Y')} be and are hereby approved and adopted."
+        sentence = f"RESOLVED THAT the financial statements of the company for the financial year ended {r_date.strftime('%d/%m/%Y')} be approved."
     elif "8. Appointment/Reappointment of Auditors" in r_type:
         a = st.text_input("Auditor Name")
-        sentence = f"RESOLVED THAT {a} be and is hereby appointed as auditors of the company for the financial year ending {r_date.strftime('%d/%m/%Y')}."
+        sentence = f"RESOLVED THAT {a} be and is hereby appointed as auditors of the company."
     elif "9. Change of Company Name" in r_type:
-        n = st.text_input("Proposed New Name")
-        sentence = f"RESOLVED THAT the name of the company be changed to {n}, subject to the approval of ACRA."
+        n = st.text_input("New Proposed Name")
+        sentence = f"RESOLVED THAT the name of the company be changed to {n}."
     elif "10. Amendments" in r_type:
-        sentence = "RESOLVED THAT the amendments to the company’s constitution as set out in the document presented to this meeting be and are hereby approved."
+        sentence = "RESOLVED THAT the amendments to the company’s constitution be and are hereby approved."
     elif "11. Dissolution" in r_type:
         l = st.text_input("Liquidator Name")
-        sentence = f"RESOLVED THAT the company be and is hereby voluntarily wound up, and that {l} be appointed as liquidator."
+        sentence = f"RESOLVED THAT the company be and is hereby voluntarily wound up and that {l} be appointed as liquidator."
 
 with col_pre:
     st.subheader("📄 Preview & Download")
@@ -165,12 +168,7 @@ with col_pre:
         with st.container(border=True):
             st.markdown(f"<h3 style='text-align: center;'>{c_name.upper()}</h3>", unsafe_allow_html=True)
             st.markdown(f"<p style='text-align: center;'>Reg: {c_reg}</p>", unsafe_allow_html=True)
-            st.write(f"**Resolution:** {sentence}")
-            st.divider()
-            st.write("**Signing Directors:**")
-            for d in directors_data:
-                if d['name']:
-                    st.write(f"- {d['name']} ({d['id']})")
+            st.write(f"**Resolution Text:** {sentence}")
         
         pdf = generate_pdf(c_name, c_reg, r_date, r_type, sentence, directors_data)
         st.download_button("📥 Download PDF", data=pdf, file_name=f"Resolution_{c_name.replace(' ', '_')}.pdf", mime="application/pdf")
