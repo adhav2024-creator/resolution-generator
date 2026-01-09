@@ -1,95 +1,4 @@
-import streamlit as st
-import pandas as pd
-from datetime import date
-from io import BytesIO
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import simpleSplit
-
-# --- 1. CONFIGURATION ---
-st.set_page_config(page_title="Corporate Resolution Generator", layout="wide")
-
-RESOLUTIONS = [
-    "1. Appointment of Directors", "2. Resignation of Directors", 
-    "3. Change of Registered Office", "4. Issuance of New Shares",
-    "5. Transfer of Shares", "6. Declaration of Dividends",
-    "7. Approval of Financial Statements", "8. Appointment/Reappointment of Auditors",
-    "9. Change of Company Name", "10. Amendments to the Company Constitution",
-    "11. Dissolution of the Company"
-]
-
-# --- 2. PDF ENGINE ---
-def generate_pdf(comp_name, reg_num, res_date, res_type, res_text, directors_data):
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    
-    # Header
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(width/2, height - 50, comp_name.upper())
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(width/2, height - 65, f"Company Registration No. {reg_num}")
-    c.drawCentredString(width/2, height - 78, "Incorporated in Singapore")
-    c.line(50, height - 90, width - 50, height - 90)
-    
-    # Title
-    c.setFont("Helvetica-Bold", 11)
-    y = height - 120
-    title = f"Directors’ Meeting Resolution in writing pursuant to the Company’s Articles of Association dated {res_date.strftime('%d/%m/%Y')}"
-    lines = simpleSplit(title, "Helvetica-Bold", 11, width - 100)
-    for line in lines:
-        c.drawString(50, y, line)
-        y -= 15
-        
-    y -= 20
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, res_type.split('. ')[1].upper())
-    
-    # Body
-    y -= 30
-    c.setFont("Helvetica", 11)
-    res_lines = simpleSplit(res_text, "Helvetica", 11, width - 100)
-    for line in res_lines:
-        c.drawString(50, y, line)
-        y -= 15
-        
-    # Closing
-    y -= 40
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "CLOSE OF MEETING")
-    y -= 15
-    c.setFont("Helvetica", 11)
-    c.drawString(50, y, "There being no other business, the meeting closed.")
-    
-    # Signatures
-    y -= 50
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "Certified as true record of Minutes")
-    
-    for director in directors_data:
-        if director['name']:
-            if y < 120:
-                c.showPage()
-                y = height - 50
-            y -= 60
-            c.drawString(50, y, "…………………………………………………………………")
-            y -= 15
-            c.drawString(50, y, director['name'].upper())
-            y -= 15
-            c.setFont("Helvetica", 10)
-            id_info = f"Director (NRIC/Passport: {director['id']})" if director['id'] else "Director"
-            c.drawString(50, y, id_info)
-            c.setFont("Helvetica-Bold", 11)
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
-
-# --- 3. UI LOGIC ---
-st.title("📜 Corporate Resolution Generator")
-
-col_in, col_pre = st.columns([1, 1.2])
+# ... (Keep your imports and PDF engine as they are)
 
 with col_in:
     st.subheader("📋 Input Details")
@@ -100,7 +9,8 @@ with col_in:
 
     st.divider()
     
-    # --- DYNAMIC DIRECTOR INPUTS ---
+    # --- FIX: Initialize 'sentence' here so it ALWAYS exists ---
+    sentence = "" 
     directors_data = []
     
     if "2. Resignation" in r_type:
@@ -114,7 +24,6 @@ with col_in:
                 id_num = st.text_input(f"NRIC/Passport {i+1}", key=f"rid{i}")
             directors_data.append({"name": name, "id": id_num})
             
-        # Build the resolution sentence for resignation
         res_strings = [f"{d['name'].upper()} (NRIC/Passport No. {d['id']})" for d in directors_data if d['name']]
         if res_strings:
             names_joined = " and ".join(res_strings)
@@ -133,9 +42,8 @@ with col_in:
             directors_data.append({"name": name, "id": id_num})
 
         st.divider()
-        sentence = ""
         
-        # Other Resolution Logic
+        # --- Logic for other types ---
         if "1. Appointment" in r_type:
             n = st.text_input("New Director Name")
             i = st.text_input("New Director NRIC/Passport")
@@ -164,12 +72,15 @@ with col_in:
         elif "9. Change of Company Name" in r_type:
             n = st.text_input("New Proposed Name")
             sentence = f"RESOLVED THAT the name of the company be changed to {n}."
+        elif "10. Amendments" in r_type: # Added this elif specifically
+            sentence = "RESOLVED THAT the amendments to the company’s constitution be and are hereby approved."
         elif "11. Dissolution" in r_type:
             l = st.text_input("Liquidator Name")
             sentence = f"RESOLVED THAT the company be and is hereby voluntarily wound up and that {l} be appointed as liquidator."
 
 with col_pre:
     st.subheader("📄 Preview & Download")
+    # Now 'sentence' is guaranteed to exist
     if sentence:
         with st.container(border=True):
             st.markdown(f"<h3 style='text-align: center;'>{c_name.upper()}</h3>", unsafe_allow_html=True)
@@ -179,3 +90,5 @@ with col_pre:
         
         pdf = generate_pdf(c_name, c_reg, r_date, r_type, sentence, directors_data)
         st.download_button("📥 Download PDF", data=pdf, file_name=f"Resolution_{c_name.replace(' ', '_')}.pdf", mime="application/pdf")
+    else:
+        st.info("Please fill in the required details to generate the resolution.")
